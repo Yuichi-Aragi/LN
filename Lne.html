@@ -1,0 +1,871 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Light Novel Library</title>
+
+    <!-- Preconnect and Load Fonts Efficiently -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <!-- External Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/dexie@3.2.2/dist/dexie.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/intersection-observer@0.12.2/intersection-observer.min.js"></script>
+    <!-- AOS Library for Scroll Animations -->
+    <link href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css" rel="stylesheet">
+    
+    <!-- Stylesheet -->
+    <style>
+        /* Root Variables */
+        :root {
+            --primary-color: #1e3a8a;
+            --secondary-color: #ffffff;
+            --background-color: #f0f4f8;
+            --card-background: #ffffff;
+            --text-primary: #1f2937;
+            --text-secondary: #6b7280;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.12);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
+            --radius-sm: 0.375rem;
+            --radius-md: 0.5rem;
+            --radius-lg: 1rem;
+            --transition-duration: 0.3s;
+            --max-width: 1280px;
+            --header-height: 80px; /* Define header height for layout adjustments */
+        }
+
+        /* Reset and Base Styles */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Main Content Styles */
+        .main {
+            flex: 1;
+            max-width: var(--max-width);
+            margin: 2rem auto;
+            padding: 0 1rem;
+        }
+
+        /* Search and Refresh Styles */
+        .search-container {
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 250px;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            border: 2px solid var(--primary-color);
+            border-radius: var(--radius-md);
+            outline: none;
+            transition: border-color var(--transition-duration) ease;
+            background-color: var(--secondary-color);
+            color: var(--text-primary);
+        }
+
+        .search-input:focus {
+            border-color: var(--text-secondary);
+        }
+
+        .refresh-button {
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            border: none;
+            border-radius: var(--radius-md);
+            background-color: var(--primary-color);
+            color: var(--secondary-color);
+            cursor: pointer;
+            transition: background-color var(--transition-duration) ease;
+            margin-left: 1rem;
+            margin-top: 1rem;
+        }
+
+        .refresh-button:hover {
+            background-color: var(--text-secondary);
+        }
+
+        /* Grid Styles */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 2rem;
+        }
+
+        /* Card Styles */
+        .card {
+            background: var(--card-background);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+            transition: transform var(--transition-duration) ease, box-shadow var(--transition-duration) ease;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            opacity: 0; /* For AOS animation */
+            animation: fadeInCard 0.5s forwards;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        @keyframes fadeInCard {
+            to { opacity: 1; }
+        }
+
+        .card__image-container {
+            position: relative;
+            width: 100%;
+            padding-top: 140%; /* 5:7 aspect ratio */
+            background: #e0e0e0;
+            overflow: hidden;
+        }
+
+        .card__image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            /* Lazy loading for better performance */
+            loading: lazy;
+        }
+
+        .card__content {
+            padding: 1rem;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .card__title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            text-align: center;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+        }
+
+        /* Loader Styles */
+        .loader {
+            display: none; /* Initially hidden */
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+            color: var(--text-secondary);
+        }
+
+        .loader.visible {
+            display: flex; /* Show when visible */
+        }
+
+        .loader__spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        /* Error Message Styles */
+        .error-message {
+            text-align: center;
+            color: #ff0000;
+            padding: 1rem;
+            background: #ffe6e6;
+            border-radius: var(--radius-sm);
+            margin: 1rem 0;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.7);
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+        }
+
+        .modal-content {
+            background-color: var(--secondary-color);
+            padding: 2rem;
+            border-radius: var(--radius-lg);
+            max-width: 700px;
+            width: 100%;
+            position: relative;
+            box-shadow: var(--shadow-lg);
+            animation: fadeInModal 0.3s ease;
+        }
+
+        @keyframes fadeInModal {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .close {
+            position: absolute;
+            top: 1rem;
+            right: 1.5rem;
+            color: var(--text-secondary);
+            font-size: 2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color var(--transition-duration) ease;
+            background: none;
+            border: none;
+            font-family: inherit;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: var(--text-primary);
+        }
+
+        .modal__title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .modal__link {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            background-color: var(--primary-color);
+            color: var(--secondary-color);
+            text-decoration: none;
+            border-radius: var(--radius-md);
+            font-weight: 600;
+            transition: background-color var(--transition-duration) ease;
+        }
+
+        .modal__link:hover {
+            background-color: var(--text-secondary);
+        }
+
+        /* Sentinel Element for Infinite Scroll */
+        .sentinel {
+            height: 1px;
+        }
+
+        /* Animations */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Responsive Styles */
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                gap: 1.5rem;
+            }
+
+            .card__title {
+                font-size: 1rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Main Content -->
+    <main class="main" role="main">
+        <!-- Search Bar and Refresh Button -->
+        <div class="search-container">
+            <input type="text" id="search-input" class="search-input" placeholder="Search light novels..." aria-label="Search light novels">
+            <button id="refresh-button" class="refresh-button" aria-label="Refresh Data">Refresh Data</button>
+        </div>
+
+        <!-- Content Grid -->
+        <div id="content" class="grid" aria-live="polite">
+            <!-- Initial Loader -->
+            <div class="loader" id="loader" role="status" aria-label="Loading novels">
+                <div class="loader__spinner"></div>
+            </div>
+        </div>
+
+        <!-- Sentinel Element for Infinite Scroll -->
+        <div class="sentinel" id="sentinel"></div>
+    </main>
+
+    <!-- Modal -->
+    <div id="modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="modal-title">
+        <div class="modal-content">
+            <button class="close" aria-label="Close modal">&times;</button>
+            <h2 id="modal-title" class="modal__title"></h2>
+            <a id="modal-link" class="modal__link" href="#" target="_blank" rel="noopener noreferrer">Read PDF</a>
+        </div>
+    </div>
+
+    <!-- AOS Library for Animations -->
+    <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+
+    <!-- Web Worker Script for Parsing (embedded as a Blob) -->
+    <script id="worker-script" type="javascript/worker">
+        self.addEventListener('message', function(e) {
+            const { action, html } = e.data;
+            if (action === 'parseHTML') {
+                try {
+                    const parser = new DOMParser();
+                    const doc = parser.parseFromString(html, 'text/html');
+                    const novels = [];
+
+                    // Select all novel entries based on the provided example HTML structure
+                    const novelEntries = doc.querySelectorAll('h3 a > span[style*="color: #ff6600;"]');
+
+                    novelEntries.forEach(span => {
+                        try {
+                            // Extract Book Name
+                            const name = span.textContent.trim();
+
+                            // Extract Parent <a> tag to get PDF Link
+                            const parentA = span.closest('a');
+                            const pdfLink = parentA ? parentA.href.trim() : undefined;
+
+                            // Extract Cover Image within the next <p> tag
+                            const entryContainer = parentA.closest('h3').nextElementSibling;
+                            const imgInP = entryContainer ? entryContainer.querySelector('a > img') : null;
+                            let coverUrl = imgInP ? imgInP.src.trim() : undefined;
+
+                            // Handle different URL formats
+                            if (coverUrl) {
+                                if (coverUrl.startsWith('//')) {
+                                    coverUrl = `https:${coverUrl}`;
+                                } else if (coverUrl.startsWith('/')) {
+                                    coverUrl = `https://jnovels.com${coverUrl}`;
+                                } else if (!coverUrl.startsWith('http')) {
+                                    // Handle relative URLs without leading '/'
+                                    coverUrl = `https://jnovels.com/${coverUrl}`;
+                                }
+                            }
+
+                            // Validate extracted data
+                            if (name && pdfLink && coverUrl) {
+                                novels.push({
+                                    name,
+                                    coverUrl,
+                                    pdfUrl: pdfLink,
+                                    timestamp: Date.now()
+                                });
+                            } else {
+                                // Incomplete data; skip
+                            }
+                        } catch (error) {
+                            // Skip any malformed entries
+                        }
+                    });
+
+                    self.postMessage({ success: true, novels });
+                } catch (error) {
+                    self.postMessage({ success: false, error: error.message });
+                }
+            }
+        });
+    </script>
+
+    <!-- JavaScript -->
+    <script>
+        'use strict';
+        (() => {
+            /**
+             * Initialize Dexie Database with Composite Unique Key (name + coverUrl + pdfUrl)
+             * This ensures that each combination of name, coverUrl, and pdfUrl is unique.
+             */
+            const db = new Dexie('MonochromeNovelsDB');
+            db.version(1).stores({
+                novels: '&[name+coverUrl+pdfUrl], name, coverUrl, pdfUrl, timestamp' // Composite unique key
+            });
+
+            // Constants
+            const PAGE_SIZE = 20; // Number of novels to load per page
+            let currentPage = 0; // Current page index
+            let isLoading = false; // Flag to prevent multiple simultaneous loads
+            let hasMore = true; // Flag to determine if more novels are available
+            let currentSearchTerm = ''; // Current search term
+
+            const PLACEHOLDER_IMAGE = 'https://via.placeholder.com/500x700?text=No+Image'; // Placeholder for missing images
+
+            /**
+             * Debounce Function to Limit Function Execution Rate
+             * @param {Function} func 
+             * @param {number} delay 
+             * @returns {Function}
+             */
+            const debounce = (func, delay) => {
+                let debounceTimer;
+                return function(...args) {
+                    const context = this;
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(() => func.apply(context, args), delay);
+                }
+            };
+
+            /**
+             * Utility: Delay Function
+             * @param {number} ms 
+             * @returns {Promise}
+             */
+            const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+            /**
+             * Utility: Retry Operation with Exponential Backoff (3 Attempts)
+             * @param {Function} operation 
+             * @param {number} attempts 
+             * @param {number} delayDuration 
+             * @returns {Promise}
+             */
+            const retryOperation = async (operation, attempts = 3, delayDuration = 1500) => {
+                for (let i = 0; i < attempts; i++) {
+                    try {
+                        return await operation();
+                    } catch (error) {
+                        if (i === attempts - 1) throw error;
+                        await delay(delayDuration * Math.pow(2, i)); // Exponential backoff
+                    }
+                }
+            };
+
+            /**
+             * Initialize Intersection Observer for Infinite Scroll using Sentinel Element
+             */
+            const setupSentinelObserver = () => {
+                const sentinel = document.getElementById('sentinel');
+                const sentinelObserver = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting && hasMore && !isLoading) {
+                            loadNextPage();
+                        }
+                    });
+                }, {
+                    rootMargin: '100px',
+                    threshold: 0
+                });
+                sentinelObserver.observe(sentinel);
+            };
+
+            /**
+             * Load Next Page of Novels from IndexedDB
+             */
+            const loadNextPage = async () => {
+                isLoading = true;
+                showLoader();
+
+                try {
+                    let novels;
+
+                    if (currentSearchTerm === '') {
+                        novels = await db.novels
+                            .orderBy('name') // Order by name for alphabetical display
+                            .offset(currentPage * PAGE_SIZE)
+                            .limit(PAGE_SIZE)
+                            .toArray();
+                    } else {
+                        novels = await db.novels
+                            .where('name')
+                            .startsWithIgnoreCase(currentSearchTerm)
+                            .offset(currentPage * PAGE_SIZE)
+                            .limit(PAGE_SIZE)
+                            .toArray();
+                    }
+
+                    if (novels.length < PAGE_SIZE) {
+                        hasMore = false; // No more novels to load
+                    }
+
+                    if (novels.length > 0) {
+                        appendNovelsToDisplay(novels);
+                        currentPage++;
+                    } else {
+                        if (currentPage === 0) {
+                            showError('No novels found for the given search term.');
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error loading novels:', error);
+                    showError('An error occurred while loading novels.');
+                } finally {
+                    hideLoader();
+                    isLoading = false;
+                }
+            };
+
+            /**
+             * Show Loader
+             */
+            const showLoader = () => {
+                const loader = document.getElementById('loader');
+                if (loader) loader.classList.add('visible');
+            };
+
+            /**
+             * Hide Loader
+             */
+            const hideLoader = () => {
+                const loader = document.getElementById('loader');
+                if (loader) loader.classList.remove('visible');
+            };
+
+            /**
+             * Display Error Message
+             * @param {string} message 
+             */
+            const showError = message => {
+                const content = document.getElementById('content');
+                // Remove existing error messages
+                const existingErrors = content.querySelectorAll('.error-message');
+                existingErrors.forEach(error => error.remove());
+
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                errorDiv.setAttribute('role', 'alert');
+                errorDiv.textContent = message;
+                content.appendChild(errorDiv);
+                hideLoader();
+            };
+
+            /**
+             * Append Novels to Display
+             * @param {Array} novels 
+             */
+            const appendNovelsToDisplay = novels => {
+                const content = document.getElementById('content');
+                const fragment = document.createDocumentFragment();
+
+                novels.forEach(novel => {
+                    const card = createNovelCard(novel);
+                    fragment.appendChild(card);
+                });
+
+                content.appendChild(fragment);
+                AOS.refresh(); // Refresh AOS to apply animations to new elements
+            };
+
+            /**
+             * Create Novel Card Element
+             * @param {Object} novel 
+             * @returns {HTMLElement}
+             */
+            const createNovelCard = (novel) => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.setAttribute('tabindex', '0');
+                card.setAttribute('role', 'button');
+                card.setAttribute('aria-labelledby', `novel-title-${encodeURIComponent(novel.name)}`);
+                card.setAttribute('data-aos', 'fade-up'); // AOS attribute for animation
+
+                // Construct HTML Structure: Image on top, title below
+                card.innerHTML = `
+                    <div class="card__image-container">
+                        <img 
+                            class="card__image" 
+                            src="${escapeHTML(novel.coverUrl || PLACEHOLDER_IMAGE)}" 
+                            alt="Cover of ${escapeHTML(novel.name)}"
+                            onerror="this.onerror=null;this.src='${PLACEHOLDER_IMAGE}';"
+                        />
+                    </div>
+                    <div class="card__content">
+                        <h2 id="novel-title-${encodeURIComponent(novel.name)}" class="card__title">${escapeHTML(novel.name)}</h2>
+                    </div>
+                `;
+
+                // Event Listener to Open Modal
+                card.addEventListener('click', () => {
+                    showModal(novel);
+                });
+
+                // Keyboard Accessibility: Open Modal on Enter or Space Key
+                card.addEventListener('keydown', event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        showModal(novel);
+                    }
+                });
+
+                return card;
+            };
+
+            /**
+             * Utility: Escape HTML to Prevent XSS
+             * @param {string} str 
+             * @returns {string}
+             */
+            const escapeHTML = (str) => {
+                if (!str) return '';
+                return str.replace(/&/g, "&amp;")
+                          .replace(/</g, "&lt;")
+                          .replace(/>/g, "&gt;")
+                          .replace(/"/g, "&quot;")
+                          .replace(/'/g, "&#039;");
+            };
+
+            /**
+             * Modal Functionality
+             */
+            const modal = document.getElementById('modal');
+            const modalTitle = document.getElementById('modal-title');
+            const modalLink = document.getElementById('modal-link');
+            const closeBtn = document.querySelector('.close');
+
+            /**
+             * Show Modal with Novel Details
+             * @param {Object} novel 
+             */
+            const showModal = (novel) => {
+                modalTitle.textContent = novel.name;
+                modalLink.href = novel.pdfUrl;
+                modal.style.display = 'flex';
+                modal.setAttribute('aria-hidden', 'false');
+                document.body.style.overflow = 'hidden'; // Prevent background scrolling
+                closeBtn.focus(); // Focus on close button for accessibility
+            };
+
+            /**
+             * Close Modal
+             */
+            const closeModal = () => {
+                modal.style.display = 'none';
+                modal.setAttribute('aria-hidden', 'true');
+                document.body.style.overflow = 'auto';
+            };
+
+            closeBtn.addEventListener('click', closeModal);
+
+            window.addEventListener('click', event => {
+                if (event.target === modal) {
+                    closeModal();
+                }
+            });
+
+            window.addEventListener('keydown', event => {
+                if (event.key === 'Escape' && modal.style.display === 'flex') {
+                    closeModal();
+                }
+            });
+
+            /**
+             * Search Functionality
+             */
+            const searchInput = document.getElementById('search-input');
+
+            const handleSearch = debounce(async () => {
+                currentSearchTerm = searchInput.value.trim();
+                currentPage = 0;
+                hasMore = true;
+
+                const content = document.getElementById('content');
+                content.innerHTML = ''; // Clear existing content
+                const existingErrors = content.querySelectorAll('.error-message');
+                existingErrors.forEach(error => error.remove());
+
+                // Reload the first page with the new search term
+                await loadNextPage();
+            }, 300); // 300ms debounce delay
+
+            searchInput.addEventListener('input', handleSearch);
+
+            /**
+             * Refresh Data Functionality
+             */
+            const refreshButton = document.getElementById('refresh-button');
+            refreshButton.addEventListener('click', async () => {
+                const confirmation = confirm('Are you sure you want to refresh the data? This may take a few moments.');
+                if (!confirmation) return;
+
+                isLoading = true;
+                showLoader();
+                hasMore = true;
+                currentPage = 0;
+
+                try {
+                    // Clear existing data
+                    await db.novels.clear();
+
+                    // Fetch and parse fresh data
+                    await fetchAndStoreNovels();
+
+                    // Reload the first page of novels
+                    const content = document.getElementById('content');
+                    content.innerHTML = ''; // Clear existing content
+                    const existingErrors = content.querySelectorAll('.error-message');
+                    existingErrors.forEach(error => error.remove());
+
+                    await loadNextPage();
+                } catch (error) {
+                    console.error('Error refreshing data:', error);
+                    showError('Failed to refresh data. Please try again later.');
+                } finally {
+                    hideLoader();
+                    isLoading = false;
+                }
+            });
+
+            /**
+             * Initialize Application
+             */
+            const initializeApp = async () => {
+                try {
+                    // Check if any novels are already stored in IndexedDB
+                    const count = await db.novels.count();
+                    if (count === 0) {
+                        // If not, fetch from the target website
+                        await fetchAndStoreNovels();
+                    }
+
+                    // Load the first page of novels
+                    await loadNextPage();
+                } catch (error) {
+                    console.error('Error initializing application:', error);
+                    showError('Failed to load novels. Please try refreshing the page.');
+                }
+            };
+
+            /**
+             * Fetch and Store Novels
+             */
+            const fetchAndStoreNovels = async () => {
+                // Initialize Web Worker
+                const workerScript = document.getElementById('worker-script').textContent;
+                const blob = new Blob([workerScript], { type: 'application/javascript' });
+                const worker = new Worker(URL.createObjectURL(blob));
+
+                try {
+                    // Listen for messages from the worker
+                    const novels = await new Promise((resolve, reject) => {
+                        worker.onmessage = (e) => {
+                            const { success, novels, error } = e.data;
+                            if (success) {
+                                resolve(novels);
+                            } else {
+                                reject(new Error(error));
+                            }
+                        };
+
+                        worker.onerror = (err) => {
+                            reject(new Error(err.message));
+                        };
+
+                        // Start parsing
+                        // Using a CORS proxy to fetch HTML
+                        fetchAndParseHTML('https://jnovels.com/top-light-novels-to-read/')
+                            .then(html => {
+                                worker.postMessage({ action: 'parseHTML', html });
+                            })
+                            .catch(err => {
+                                reject(err);
+                            });
+                    });
+
+                    if (novels.length === 0) {
+                        throw new Error('No novels found on the target page.');
+                    }
+
+                    // Bulk upsert novels to IndexedDB
+                    try {
+                        await db.novels.bulkPut(novels);
+                    } catch (bulkPutError) {
+                        if (bulkPutError.name === 'BulkError') {
+                            // Some entries were duplicates; handle accordingly
+                            console.warn('Some novels were duplicates and were skipped.');
+                        } else {
+                            console.error('Error bulk upserting novels:', bulkPutError);
+                            throw bulkPutError; // Re-throw to be handled by caller
+                        }
+                    }
+                } finally {
+                    worker.terminate();
+                }
+            };
+
+            /**
+             * Fetch HTML Content with Content-Type Validation via CORS Proxy
+             * @param {string} url 
+             * @returns {Promise<string>}
+             */
+            const fetchAndParseHTML = async (url) => {
+                // Using allorigins API to bypass CORS
+                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(url)}`;
+                const response = await fetch(proxyUrl);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+                // Check Content-Type Header
+                const contentType = response.headers.get('Content-Type');
+                if (!contentType || !contentType.includes('application/json')) {
+                    throw new Error('Fetched content is not of expected type application/json');
+                }
+
+                const data = await response.json();
+                if (!data || !data.contents) {
+                    throw new Error('No contents found in the fetched data.');
+                }
+
+                return data.contents;
+            };
+
+            /**
+             * Parse Fetched HTML to Extract Novel Data
+             * This function is now handled by the Web Worker for better performance.
+             * @param {string} html 
+             * @returns {Array<Object>}
+             */
+            // Removed as it's now handled by the Web Worker
+
+            /**
+             * Initialize AOS and Start the Application once the DOM is fully loaded
+             */
+            document.addEventListener('DOMContentLoaded', () => {
+                // Initialize AOS
+                AOS.init({
+                    duration: 800,
+                    easing: 'ease-in-out',
+                    once: true,
+                });
+                setupSentinelObserver();
+                initializeApp();
+            });
+        })();
+    </script>
+</body>
+</html>
