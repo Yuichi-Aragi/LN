@@ -1,0 +1,693 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Monochrome Light Novel Collection</title>
+
+    <!-- Preconnect and Load Fonts Efficiently -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin>
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+
+    <!-- External Libraries Without `defer` to Ensure Execution Order -->
+    <script src="https://cdn.jsdelivr.net/npm/dexie@3.2.2/dist/dexie.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/intersection-observer@0.12.2/intersection-observer.min.js"></script>
+
+    <!-- Stylesheet -->
+    <style>
+        /* Root Variables */
+        :root {
+            --primary-color: #000000;
+            --secondary-color: #ffffff;
+            --background-color: #f5f5f5;
+            --card-background: #ffffff;
+            --text-primary: #000000;
+            --text-secondary: #666666;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.12);
+            --shadow-md: 0 4px 6px rgba(0,0,0,0.1);
+            --shadow-lg: 0 10px 15px rgba(0,0,0,0.1);
+            --radius-sm: 0.375rem;
+            --radius-md: 0.5rem;
+            --radius-lg: 1rem;
+            --transition-duration: 0.3s;
+            --max-width: 1280px;
+            --header-height: 80px; /* Define header height for layout adjustments */
+        }
+
+        /* Reset and Base Styles */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--background-color);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Main Content Styles */
+        .main {
+            flex: 1;
+            max-width: var(--max-width);
+            margin: 0 auto;
+            padding: 2rem 1rem; /* Removed top padding related to header */
+        }
+
+        /* Search Styles */
+        .search-container {
+            margin-bottom: 2rem;
+            display: flex;
+            justify-content: center;
+        }
+
+        .search-input {
+            width: 100%;
+            max-width: 600px;
+            padding: 0.75rem 1.5rem;
+            font-size: 1rem;
+            border: 2px solid var(--primary-color);
+            border-radius: var(--radius-md);
+            outline: none;
+            transition: border-color var(--transition-duration) ease;
+            background-color: var(--secondary-color);
+            color: var(--text-primary);
+        }
+
+        .search-input:focus {
+            border-color: var(--text-secondary);
+        }
+
+        /* Grid Styles */
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 2rem;
+        }
+
+        /* Card Styles */
+        .card {
+            background: var(--card-background);
+            border-radius: var(--radius-md);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+            transition: transform var(--transition-duration) ease, box-shadow var(--transition-duration) ease;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: var(--shadow-lg);
+        }
+
+        .card__image-container {
+            position: relative;
+            width: 100%;
+            padding-top: 140%; /* 5:7 aspect ratio */
+            background: #e0e0e0;
+            overflow: hidden;
+        }
+
+        .card__image {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transition: opacity var(--transition-duration) ease;
+            opacity: 0;
+        }
+
+        .card__image.loaded {
+            opacity: 1;
+        }
+
+        .card__content {
+            padding: 1rem;
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center; /* Center the book name vertically */
+        }
+
+        .card__title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            text-align: center; /* Center-align the book name */
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: -webkit-box;
+            -webkit-line-clamp: 3;
+            -webkit-box-orient: vertical;
+        }
+
+        /* Loader Styles */
+        .loader {
+            display: none; /* Initially hidden */
+            justify-content: center;
+            align-items: center;
+            height: 200px;
+            color: var(--text-secondary);
+        }
+
+        .loader.visible {
+            display: flex; /* Show when visible */
+        }
+
+        .loader__spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid #f3f3f3;
+            border-top: 5px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        /* Error Message Styles */
+        .error-message {
+            text-align: center;
+            color: #ff0000;
+            padding: 1rem;
+            background: #ffe6e6;
+            border-radius: var(--radius-sm);
+            margin: 1rem 0;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 2000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.7);
+            justify-content: center;
+            align-items: center;
+            padding: 1rem;
+        }
+
+        .modal-content {
+            background-color: var(--secondary-color);
+            padding: 2rem;
+            border-radius: var(--radius-lg);
+            max-width: 700px;
+            width: 100%;
+            position: relative;
+            box-shadow: var(--shadow-lg);
+            animation: fadeIn 0.3s ease;
+        }
+
+        .close {
+            position: absolute;
+            top: 1rem;
+            right: 1.5rem;
+            color: var(--text-secondary);
+            font-size: 2rem;
+            font-weight: bold;
+            cursor: pointer;
+            transition: color var(--transition-duration) ease;
+            background: none;
+            border: none;
+            font-family: inherit;
+        }
+
+        .close:hover,
+        .close:focus {
+            color: var(--text-primary);
+        }
+
+        .modal__title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: var(--text-primary);
+        }
+
+        .modal__link {
+            display: inline-block;
+            padding: 0.75rem 1.5rem;
+            background-color: var(--primary-color);
+            color: var(--secondary-color);
+            text-decoration: none;
+            border-radius: var(--radius-md);
+            font-weight: 600;
+            transition: background-color var(--transition-duration) ease;
+        }
+
+        .modal__link:hover {
+            background-color: var(--text-secondary);
+        }
+
+        /* Sentinel Element for Infinite Scroll */
+        .sentinel {
+            height: 1px;
+        }
+
+        /* Animations */
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Responsive Styles */
+        @media (max-width: 768px) {
+            .grid {
+                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+                gap: 1.5rem;
+            }
+
+            .card__title {
+                font-size: 1rem;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Main Content -->
+    <main class="main" role="main">
+        <!-- Search Bar -->
+        <div class="search-container">
+            <input type="text" id="search-input" class="search-input" placeholder="Search light novels..." aria-label="Search light novels">
+        </div>
+
+        <!-- Content Grid -->
+        <div id="content" class="grid" aria-live="polite">
+            <!-- Initial Loader -->
+            <div class="loader" id="loader" role="status" aria-label="Loading novels">
+                <div class="loader__spinner"></div>
+            </div>
+        </div>
+
+        <!-- Sentinel Element for Infinite Scroll -->
+        <div class="sentinel" id="sentinel"></div>
+    </main>
+
+    <!-- Modal -->
+    <div id="modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="modal-title">
+        <div class="modal-content">
+            <button class="close" aria-label="Close modal">&times;</button>
+            <h2 id="modal-title" class="modal__title"></h2>
+            <a id="modal-link" class="modal__link" href="#" target="_blank" rel="noopener noreferrer">Read PDF</a>
+        </div>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        (() => {
+            // Initialize Dexie Database with Unique Constraint on pdfUrl to Prevent Duplicates
+            const db = new Dexie('MonochromeNovelsDB');
+            db.version(2130).stores({
+                novels: '++id, name, coverUrl, &pdfUrl, timestamp'
+            });
+
+            // Constants
+            const PAGE_SIZE = 20; // Number of novels to load per page
+            let currentPage = 0; // Current page index
+            let isLoading = false; // Flag to prevent multiple simultaneous loads
+            let hasMore = true; // Flag to determine if more novels are available
+            let currentSearchTerm = ''; // Current search term
+
+            const PLACEHOLDER_IMAGE = 'https://via.placeholder.com/500x700?text=No+Image'; // Placeholder for missing images
+
+            // In-memory Cache for Image Loading to Prevent Duplicate Loads
+            const imageLoadingPromises = new Map();
+
+            // Debounce Function to Limit Function Execution Rate
+            const debounce = (func, delay) => {
+                let debounceTimer;
+                return function(...args) {
+                    const context = this;
+                    clearTimeout(debounceTimer);
+                    debounceTimer = setTimeout(() => func.apply(context, args), delay);
+                }
+            };
+
+            // Utility: Delay Function
+            const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+            // Utility: Retry Operation with Exponential Backoff (without logging retries)
+            const retryOperation = async (operation, attempts = 3, delayDuration = 1500) => {
+                for (let i = 0; i < attempts; i++) {
+                    try {
+                        return await operation();
+                    } catch (error) {
+                        if (i === attempts - 1) throw error;
+                        await delay(delayDuration * (i + 1)); // Exponential backoff
+                    }
+                }
+            };
+
+            // Initialize Intersection Observer for Infinite Scroll using Sentinel Element
+            const setupSentinelObserver = () => {
+                const sentinel = document.getElementById('sentinel');
+                const sentinelObserver = new IntersectionObserver((entries) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting && hasMore && !isLoading) {
+                            loadNextPage();
+                        }
+                    });
+                }, {
+                    rootMargin: '100px',
+                    threshold: 0
+                });
+                sentinelObserver.observe(sentinel);
+            };
+
+            // Load Next Page of Novels from IndexedDB
+            const loadNextPage = async () => {
+                isLoading = true;
+                showLoader();
+
+                try {
+                    let novels;
+
+                    if (currentSearchTerm === '') {
+                        novels = await db.novels
+                            .orderBy('id') // Order by id to maintain extraction order
+                            .offset(currentPage * PAGE_SIZE)
+                            .limit(PAGE_SIZE)
+                            .toArray();
+                    } else {
+                        novels = await db.novels
+                            .where('name')
+                            .startsWithIgnoreCase(currentSearchTerm)
+                            .offset(currentPage * PAGE_SIZE)
+                            .limit(PAGE_SIZE)
+                            .toArray();
+                    }
+
+                    if (novels.length < PAGE_SIZE) {
+                        hasMore = false; // No more novels to load
+                    }
+
+                    if (novels.length > 0) {
+                        appendNovelsToDisplay(novels);
+                        currentPage++;
+                    }
+                } catch (error) {
+                    console.error('Error loading novels:', error);
+                    showError('An error occurred while loading novels.');
+                } finally {
+                    hideLoader();
+                    isLoading = false;
+                }
+            };
+
+            // Show Loader
+            const showLoader = () => {
+                const loader = document.getElementById('loader');
+                if (loader) loader.classList.add('visible');
+            };
+
+            // Hide Loader
+            const hideLoader = () => {
+                const loader = document.getElementById('loader');
+                if (loader) loader.classList.remove('visible');
+            };
+
+            // Display Error Message
+            const showError = message => {
+                const content = document.getElementById('content');
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'error-message';
+                errorDiv.setAttribute('role', 'alert');
+                errorDiv.textContent = message;
+                content.appendChild(errorDiv);
+                hideLoader();
+            };
+
+            // Append Novels to Display
+            const appendNovelsToDisplay = novels => {
+                const content = document.getElementById('content');
+                const fragment = document.createDocumentFragment();
+
+                novels.forEach(novel => {
+                    const card = createNovelCard(novel);
+                    fragment.appendChild(card);
+                });
+
+                content.appendChild(fragment);
+                setupImageObserver(); // Initialize lazy loading for new images
+            };
+
+            // Create Novel Card Element
+            const createNovelCard = novel => {
+                const card = document.createElement('div');
+                card.className = 'card';
+                card.setAttribute('tabindex', '0');
+                card.setAttribute('role', 'button');
+                card.setAttribute('aria-labelledby', `novel-title-${novel.id}`);
+
+                // Construct HTML Structure: Image on top, title below
+                card.innerHTML = `
+                    <div class="card__image-container">
+                        <img 
+                            class="card__image lazy" 
+                            data-src="${novel.coverUrl}" 
+                            alt="Cover of ${novel.name}"
+                            loading="lazy"
+                        />
+                    </div>
+                    <div class="card__content">
+                        <h2 id="novel-title-${novel.id}" class="card__title">${novel.name}</h2>
+                    </div>
+                `;
+
+                // Event Listener to Open Modal
+                card.addEventListener('click', () => {
+                    showModal(novel);
+                });
+
+                // Keyboard Accessibility: Open Modal on Enter or Space Key
+                card.addEventListener('keydown', event => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        showModal(novel);
+                    }
+                });
+
+                return card;
+            };
+
+            // Initialize Image Observer for Lazy Loading Images
+            let imageObserver;
+            const setupImageObserver = () => {
+                if (imageObserver) return; // Prevent multiple observers
+
+                imageObserver = new IntersectionObserver((entries, observer) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const img = entry.target;
+                            loadImage(img).then(() => observer.unobserve(img));
+                        }
+                    });
+                }, {
+                    rootMargin: '50px 0px',
+                    threshold: 0.1
+                });
+
+                const lazyImages = document.querySelectorAll('.card__image.lazy');
+                lazyImages.forEach(img => {
+                    imageObserver.observe(img);
+                });
+            };
+
+            // Load Image and Handle Fallback
+            const loadImage = async img => {
+                const src = img.dataset.src;
+                if (!src) return;
+
+                if (!imageLoadingPromises.has(src)) {
+                    const promise = retryOperation(async () => {
+                        return new Promise((resolve, reject) => {
+                            const tempImage = new Image();
+                            tempImage.onload = () => {
+                                img.src = src;
+                                img.classList.add('loaded');
+                                resolve();
+                            };
+                            tempImage.onerror = () => {
+                                img.src = PLACEHOLDER_IMAGE;
+                                img.classList.add('loaded'); // Still resolve to remove loading state
+                                resolve();
+                            };
+                            tempImage.src = src;
+                        });
+                    }).finally(() => imageLoadingPromises.delete(src));
+
+                    imageLoadingPromises.set(src, promise);
+                }
+
+                return imageLoadingPromises.get(src);
+            };
+
+            // Modal Functionality
+            const modal = document.getElementById('modal');
+            const modalTitle = document.getElementById('modal-title');
+            const modalLink = document.getElementById('modal-link');
+            const closeBtn = document.querySelector('.close');
+
+            const showModal = novel => {
+                modalTitle.textContent = novel.name;
+                modalLink.href = novel.pdfUrl;
+                modal.style.display = 'flex';
+                modal.setAttribute('aria-hidden', 'false');
+                document.body.style.overflow = 'hidden'; // Prevent background scrolling
+                closeBtn.focus(); // Focus on close button for accessibility
+            };
+
+            const closeModal = () => {
+                modal.style.display = 'none';
+                modal.setAttribute('aria-hidden', 'true');
+                document.body.style.overflow = 'auto';
+            };
+
+            closeBtn.addEventListener('click', closeModal);
+
+            window.addEventListener('click', event => {
+                if (event.target === modal) {
+                    closeModal();
+                }
+            });
+
+            window.addEventListener('keydown', event => {
+                if (event.key === 'Escape' && modal.style.display === 'flex') {
+                    closeModal();
+                }
+            });
+
+            // Search Functionality
+            const searchInput = document.getElementById('search-input');
+
+            const handleSearch = debounce(async () => {
+                currentSearchTerm = searchInput.value.trim();
+                currentPage = 0;
+                hasMore = true;
+
+                const content = document.getElementById('content');
+                content.innerHTML = ''; // Clear existing content
+
+                // Reload the first page with the new search term
+                await loadNextPage();
+            }, 300); // 300ms debounce delay
+
+            searchInput.addEventListener('input', handleSearch);
+
+            // Initialize Application
+            const initializeApp = async () => {
+                try {
+                    // Check if any novels are already stored in IndexedDB
+                    const count = await db.novels.count();
+                    if (count === 0) {
+                        // If not, fetch from the target website
+                        const html = await retryOperation(() => fetchHTML('https://jnovels.com/top-light-novels-to-read/'));
+                        const novels = parseHTML(html);
+
+                        if (novels.length === 0) {
+                            showError('No novels found on the target page.');
+                            return;
+                        }
+
+                        // Bulk add novels to IndexedDB (duplicates will be skipped due to unique constraint)
+                        await db.novels.bulkAdd(novels);
+                    }
+
+                    // Load the first page of novels
+                    await loadNextPage();
+                } catch (error) {
+                    console.error('Error initializing application:', error.message || error);
+                    showError('Failed to load novels. Please try refreshing the page.');
+                }
+            };
+
+            // Fetch HTML Content via Proxy
+            const fetchHTML = async url => {
+                const response = await fetch(`https://api.allorigins.win/get?url=${encodeURIComponent(url)}`);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                const data = await response.json();
+                return data.contents;
+            };
+
+            // Parse Fetched HTML to Extract Novel Data in Order
+            const parseHTML = html => {
+                const parser = new DOMParser();
+                const doc = parser.parseFromString(html, 'text/html');
+                const novels = [];
+
+                // Select all h3 elements which contain the book name and PDF link
+                const h3Elements = doc.querySelectorAll('h3');
+
+                h3Elements.forEach(h3 => {
+                    try {
+                        // Extract Book Name
+                        const nameElement = h3.querySelector('a span style=\"color: #ff6600');
+                        const name = nameElement?.textContent.trim();
+
+                        // Extract PDF Link
+                        const pdfLink = h3.querySelector('a')?.getAttribute('href').trim();
+
+                        // The next sibling p tag contains the book cover image
+                        const p = h3.nextElementSibling;
+                        if (p && p.tagName.toLowerCase() === 'p') {
+                            const imgElement = p.querySelector('img');
+                            let coverUrl = imgElement?.getAttribute('src');
+                            if (coverUrl && coverUrl.startsWith('//')) {
+                                coverUrl = `https:${coverUrl}`;
+                            }
+                            if (coverUrl && coverUrl !== '') {
+                                novels.push({
+                                    name,
+                                    coverUrl,
+                                    pdfUrl: pdfLink,
+                                    timestamp: Date.now()
+                                });
+                            }
+                        }
+                    } catch (error) {
+                        // Skip any malformed entries
+                        console.error('Error parsing a novel entry:', error);
+                    }
+                });
+
+                return novels;
+            };
+
+            // Start the application once the DOM is fully loaded
+            document.addEventListener('DOMContentLoaded', () => {
+                setupSentinelObserver();
+                initializeApp();
+            });
+
+            // Clear IndexedDB when the user exits (except for db storage)
+            // Since IndexedDB is the db storage, we won't clear it as per requirement
+            // Instead, clear any other caches if necessary
+            // Currently, our only cache is in-memory (imageLoadingPromises), which naturally clears on exit
+        })();
+    </script>
+</body>
+</html>
