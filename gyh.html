@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Light Novel Library</title>
+  <!-- Preconnect for performance -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <!-- Load Fonts with swap to ensure text visibility -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <!-- External Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/dexie@3.2.5/dist/dexie.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.6/purify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.js"></script>
+  <!-- AOS CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/aos@2.3.4/dist/aos.css" rel="stylesheet">
+  <!-- Stylesheet -->
+ <link rel="stylesheet" href="styles.css">
+  </style>
+</head>
+<body>
+  <!-- Header with Title -->
+  <header class="header">
+    <div class="header__title">Light Novel Library Collection</div>
+  </header>
+  <!-- Menu Button -->
+  <button class="menu-button" id="menu-button" aria-label="Open Menu">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+      <path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/>
+    </svg>
+  </button>
+  <!-- Menu -->
+  <nav class="menu" id="menu">
+    <ul class="menu__list">
+        <li class="menu__item" data-target="home">Home</li>
+        <li class="menu__item" data-target="ln-pdfs">LN PDFs</li>
+        <li class="menu__item" data-target="ln-epubs">LN EPUBs</li>
+        <li class="menu__item" data-target="release-dates">Release Dates</li>
+        <li class="menu__item" data-target="webnovels">Web Novels</li>
+        <li class="menu__item" data-target="manga">Manga</li>
+        <li class="menu__item" data-target="settings">Settings</li>
+    </ul>
+  </nav>
+  <!-- Settings Panel -->
+  <div class="settings-panel" id="settings-panel">
+    <div class="settings-panel__content">
+      <button class="settings-panel__close" aria-label="Close Settings">×</button>
+      <h2 class="settings-panel__title">Settings</h2>
+      <div class="settings-panel__toggle">
+        <label for="theme-toggle">Dark Mode</label>
+        <label class="toggle-switch">
+          <input type="checkbox" id="theme-toggle" aria-label="Toggle Dark Mode">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="settings-panel__refresh">
+        <button id="refresh-button" class="refresh-button" aria-label="Refresh Data">
+          <!-- Refresh Icon SVG -->
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path d="M17.65 6.35a7.95 7.95 0 00-11.3 0l-1.41-1.42a10 10 0 0114.14 0c.39.39.39 1.02 0 1.41l-1.42 1.42zM6.35 17.65a7.95 7.95 0 0011.3 0l1.41 1.42a10 10 0 01-14.14 0c-.39-.39-.39-1.02 0-1.41l1.42-1.42z"/>
+          </svg>
+          Refresh Data
+        </button>
+      </div>
+    </div>
+  </div>
+  <!-- Main Content -->
+  <main class="main" role="main">
+    <!-- Search Bar -->
+    <div class="search-container">
+      <input type="text" id="search-input" class="search-input" placeholder="Search light novels..." aria-label="Search light novels">
+    </div>
+    <!-- Progress Bar -->
+    <div class="progress-container" id="progress-container">
+      <div class="progress-bar" id="progress-bar"></div>
+    </div>
+    <div class="progress-text" id="progress-text">0%</div>
+    <!-- Content Grid -->
+    <div id="content" class="grid" aria-live="polite">
+      <!-- Initial Loader -->
+      <div class="loader" id="loader" role="status" aria-label="Loading novels">
+        <div class="loader__spinner"></div>
+      </div>
+    </div>
+    <!-- Sentinel Element for Infinite Scroll -->
+    <div class="sentinel" id="sentinel"></div>
+  </main>
+  <!-- Modal -->
+  <div id="modal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="modal-title">
+    <div class="modal-content">
+      <button class="close" aria-label="Close modal">×</button>
+      <h2 id="modal-title" class="modal__title"></h2>
+      <a id="modal-link" class="modal__link" href="#" target="_blank" rel="noopener noreferrer">Read PDF</a>
+    </div>
+  </div>
+  <!-- Toast Notifications -->
+  <div class="toast-container" id="toast-container"></div>
+  <!-- JavaScript -->
+  <script src="script.js"></script>
+</body>
+</html>
