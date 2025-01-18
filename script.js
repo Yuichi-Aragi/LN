@@ -14,7 +14,7 @@
       coverImage: 'img',
       coverImageSrc: ['src'],
     },
-    apiUrl: 'https://api.allorigins.win/raw?url=https://jnovels.com/top-light-novels-to-read/',
+    apiUrl: 'https://jnovels.com/top-light-novels-to-read/',
     placeholderImage: 'https://via.placeholder.com/500x700?text=No+Image',
     initialPageSize: 30, // Initial number of novels to load
     dynamicPageSize: 20, // Page size for dynamic loading based on scroll speed
